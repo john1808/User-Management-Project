@@ -207,14 +207,25 @@ WSGI_APPLICATION = "user_mgmt.wsgi.application"
 # 2) Else fall back to individual DB_* env vars (useful for local .env)
 DATABASE_URL = env("DATABASE_URL", default=None)
 
+
+
+
 if DATABASE_URL:
+    # DATABASES = {
+    #     "default": dj_database_url.parse(
+    #         DATABASE_URL,
+    #         conn_max_age=600,
+    #         ssl_require=True
+    #     )
+    # }
     DATABASES = {
-        "default": dj_database_url.parse(
-            DATABASE_URL,
-            conn_max_age=600,
-            ssl_require=True
-        )
-    }
+            "default": dj_database_url.config(
+                default=DATABASE_URL,
+                conn_max_age=600,
+                ssl_require=True   
+            )
+        }
+
 else:
     DATABASES = {
         "default": {
