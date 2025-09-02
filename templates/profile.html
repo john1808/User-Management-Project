@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Profile</title>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <style>
+    body{font-family:sans-serif;max-width:720px;margin:3rem auto}
+    input,textarea,button,select{padding:.6rem;margin:.25rem 0;width:100%}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+    .actions{display:flex;gap:.5rem}
+    .nav{margin-bottom:1rem}
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="/tasks/">Tasks</a> ·
+    <a href="/" onclick="logout()">Logout</a>
+  </div>
+
+  <h2>My Profile</h2>
+  <div class="row">
+    <div>
+      <label>Full Name</label>
+      <input id="full_name" />
+    </div>
+    <div>
+      <label>Date of Birth</label>
+      <input id="dob" type="date" />
+    </div>
+    <div>
+      <label>Email</label>
+      <input id="email" disabled />
+    </div>
+    <div>
+      <label>Gender</label>
+      <select id="gender">
+        <option value="">—</option>
+        <option value="M">Male</option>
+        <option value="F">Female</option>
+      </select>
+    </div>
+    <div style="grid-column: 1 / -1">
+      <label>Address</label>
+      <textarea id="address"></textarea>
+    </div>
+    <div>
+      <label>Mobile</label>
+      <input id="mobile" />
+    </div>
+  </div>
+
+  <div class="actions">
+    <button id="updateBtn">Update Profile</button>
+  </div>
+
+  <h3>Reset Password</h3>
+  <input id="new_password" type="password" placeholder="New password" />
+  <button id="resetBtn">Reset Password</button>
+
+  <script>
+    const token = localStorage.getItem("access");
+    if (!token) window.location.href = "/";
+
+    function authHeaders() { return { "Authorization": "Bearer " + token }; }
+    function logout(){ localStorage.clear(); }
+
+    // Load current profile
+    $.ajax({
+      url: "/api/accounts/profile/",
+      type: "GET",
+      headers: authHeaders(),
+      success: function (res) {
+        $("#full_name").val(res.full_name || "");
+        $("#dob").val(res.dob || "");
+        $("#email").val(res.email || "");
+        $("#address").val(res.address || "");
+        $("#gender").val(res.gender || "");
+        $("#mobile").val(res.mobile || "");
+      },
+      error: function(){ alert("Please login again."); window.location.href = "/"; }
+    });
+
+    // Update profile
+    $("#updateBtn").click(function () {
+      $.ajax({
+        url: "/api/accounts/profile/",
+        type: "PUT",
+        headers: authHeaders(),
+        contentType: "application/json",
+        data: JSON.stringify({
+          full_name: $("#full_name").val(),
+          dob: $("#dob").val(),
+          address: $("#address").val(),
+          gender: $("#gender").val(),
+          mobile: $("#mobile").val()
+        }),
+        success: function () { alert("Profile updated!"); }
+      });
+    });
+
+    // Reset password
+    $("#resetBtn").click(function () {
+      const pw = $("#new_password").val();
+      if (!pw) return alert("Enter a new password");
+      $.ajax({
+        url: "/api/accounts/reset-password/",
+        type: "POST",
+        headers: authHeaders(),
+        contentType: "application/json",
+        data: JSON.stringify({ password: pw }),
+        success: function(){ alert("Password updated. Please login again."); logout(); window.location.href="/"; }
+      });
+    });
+  </script>
+</body>
+</html>

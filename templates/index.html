@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Login</title>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <style>body{font-family:sans-serif;max-width:560px;margin:3rem auto} input,button{padding:.6rem;margin:.25rem 0;width:100%}</style>
+</head>
+<body>
+  <h2>Login</h2>
+  <input id="username" placeholder="Username" />
+  <input id="password" type="password" placeholder="Password" />
+  <button id="loginBtn">Login</button>
+  <p>No account? <a href="/register/">Register</a></p>
+
+  <script>
+    $("#loginBtn").click(function () {
+      $.ajax({
+        url: "/api/token/",
+        type: "POST",
+        contentType: "application/json",
+        data: JSON.stringify({
+          username: $("#username").val(),
+          password: $("#password").val()
+        }),
+        success: function (res) {
+          localStorage.setItem("access", res.access);
+          localStorage.setItem("refresh", res.refresh);
+          window.location.href = "/profile/";
+        },
+        error: function () { alert("Invalid username or password"); }
+      });
+    });
+  </script>
+</body>
+</html>

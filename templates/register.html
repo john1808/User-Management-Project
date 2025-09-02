@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Register</title>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <style>body{font-family:sans-serif;max-width:560px;margin:3rem auto} input,button{padding:.6rem;margin:.25rem 0;width:100%}</style>
+</head>
+<body>
+  <h2>Create Account</h2>
+  <input id="username" placeholder="Username" />
+  <input id="email" placeholder="Email" />
+  <input id="password" type="password" placeholder="Password" />
+  <button id="registerBtn">Register</button>
+  <p>Already have an account? <a href="/">Login</a></p>
+
+  <script>
+    $("#registerBtn").click(function () {
+      $.ajax({
+        url: "/api/accounts/register/",
+        type: "POST",
+        contentType: "application/json",
+        data: JSON.stringify({
+          username: $("#username").val(),
+          email: $("#email").val(),
+          password: $("#password").val()
+        }),
+        success: function () {
+          alert("Registered successfully! Please login.");
+          window.location.href = "/";
+        },
+        error: function (xhr) { alert("Error: " + xhr.responseText); }
+      });
+    });
+  </script>
+</body>
+</html>

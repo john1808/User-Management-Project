@@ -1,0 +1,459 @@
+{% comment %} <!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Tasks</title>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <style>
+    body{font-family:sans-serif;max-width:900px;margin:3rem auto}
+    input,textarea,button{padding:.6rem;margin:.25rem 0}
+    .grid{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:1rem;align-items:center}
+    .card{border:1px solid #ddd;border-radius:10px;padding:1rem;margin:.5rem 0}
+    .top{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem}
+    .nav{margin-bottom:1rem}
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="/profile/">Profile</a> ·
+    <a href="/" onclick="logout()">Logout</a>
+  </div>
+
+  <h2>My Tasks</h2>
+
+  <div class="top">
+    <div>
+      <input id="title" placeholder="Task title" style="width:100%" />
+      <textarea id="desc" placeholder="Description" style="width:100%"></textarea>
+      <input id="file" type="file" />
+      <button id="createBtn">Create Task</button>
+    </div>
+  </div>
+
+  <div id="list"></div>
+
+  <script>
+    const token = localStorage.getItem("access");
+    if (!token) window.location.href = "/";
+
+    function authHeaders(){ return { "Authorization": "Bearer " + token }; }
+    function logout(){ localStorage.clear(); }
+
+    function render(tasks){
+      $("#list").empty();
+      tasks.forEach(t => {
+        const a = t.attachment ? `<a href="${t.attachment}" target="_blank">Attachment</a>` : "—";
+        $("#list").append(`
+          <div class="card" id="task-${t.id}">
+            <div class="grid">
+              <input value="${t.title}" id="t-${t.id}-title" />
+              <div>Created: ${new Date(t.created_at).toLocaleString()}</div>
+              <div>Updated: ${new Date(t.modified_at).toLocaleString()}</div>
+              <div>${a}</div>
+            </div>
+            <textarea id="t-${t.id}-desc" style="width:100%">${t.description || ""}</textarea>
+            <div>
+              <input type="file" id="t-${t.id}-file" />
+              <button onclick="updateTask(${t.id})">Save</button>
+              <button onclick="deleteTask(${t.id})">Delete</button>
+            </div>
+          </div>
+        `);
+      });
+    }
+
+    function load(){
+      $.ajax({
+        url: "/api/tasks/",
+        type: "GET",
+        headers: authHeaders(),
+        success: render
+      });
+    }
+
+    $("#createBtn").click(function(){
+      const fd = new FormData();
+      fd.append("title", $("#title").val());
+      fd.append("description", $("#desc").val());
+      const f = $("#file")[0].files[0];
+      if (f) fd.append("attachment", f);
+
+      $.ajax({
+        url: "/api/tasks/",
+        type: "POST",
+        headers: authHeaders(),
+        processData: false,
+        contentType: false,
+        data: fd,
+        success: function(){ $("#title").val(""); $("#desc").val(""); $("#file").val(""); load(); }
+      });
+    });
+
+    window.updateTask = function(id){
+      const fd = new FormData();
+      fd.append("title", $(`#t-${id}-title`).val());
+      fd.append("description", $(`#t-${id}-desc`).val());
+      const f = $(`#t-${id}-file`)[0].files[0];
+      if (f) fd.append("attachment", f);
+
+      $.ajax({
+        url: `/api/tasks/${id}/`,
+        type: "PUT",
+        headers: authHeaders(),
+        processData: false,
+        contentType: false,
+        data: fd,
+        success: function(){ load(); }
+      });
+    }
+
+    window.deleteTask = function(id){
+      $.ajax({
+        url: `/api/tasks/${id}/`,
+        type: "DELETE",
+        headers: authHeaders(),
+        success: function(){ $(`#task-${id}`).remove(); }
+      });
+    }
+
+    load();
+  </script>
+</body>
+</html> {% endcomment %}
+
+
+{% comment %} 
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Tasks</title>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <style>
+    body{font-family:sans-serif;max-width:900px;margin:3rem auto}
+    input,textarea,button{padding:.6rem;margin:.25rem 0}
+    .grid{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:1rem;align-items:center}
+    .card{border:1px solid #ddd;border-radius:10px;padding:1rem;margin:.5rem 0}
+    .top{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem}
+    .nav{margin-bottom:1rem}
+    #pagination{margin-top:1rem}
+    #pagination button{padding:.5rem 1rem;margin:0 .25rem}
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="/profile/">Profile</a> ·
+    <a href="/" onclick="logout()">Logout</a>
+  </div>
+
+  <h2>My Tasks</h2>
+
+  <div class="top">
+    <div>
+      <input id="title" placeholder="Task title" style="width:100%" />
+      <textarea id="desc" placeholder="Description" style="width:100%"></textarea>
+      <input id="file" type="file" />
+      <button id="createBtn">Create Task</button>
+    </div>
+  </div>
+
+  <div id="list"></div>
+  <div id="pagination"></div>
+
+  <script>
+    const token = localStorage.getItem("access");
+    if (!token) window.location.href = "/";
+
+    function authHeaders(){ return { "Authorization": "Bearer " + token }; }
+    function logout(){ localStorage.clear(); }
+
+    let currentPage = 1;   // track current page
+    let totalPages = 1;    // update based on API count
+
+    // render tasks
+    function render(tasks){
+      $("#list").empty();
+      tasks.forEach(t => {
+        const a = t.attachment ? `<a href="${t.attachment}" target="_blank">Attachment</a>` : "—";
+        $("#list").append(`
+          <div class="card" id="task-${t.id}">
+            <div class="grid">
+              <input value="${t.title}" id="t-${t.id}-title" />
+              <div>Created: ${new Date(t.created_at).toLocaleString()}</div>
+              <div>Updated: ${new Date(t.modified_at).toLocaleString()}</div>
+              <div>${a}</div>
+            </div>
+            <textarea id="t-${t.id}-desc" style="width:100%">${t.description || ""}</textarea>
+            <div>
+              <input type="file" id="t-${t.id}-file" />
+              <button onclick="updateTask(${t.id})">Save</button>
+              <button onclick="deleteTask(${t.id})">Delete</button>
+            </div>
+          </div>
+        `);
+      });
+    }
+
+    // render pagination buttons
+    function renderPagination(data){
+      $("#pagination").empty();
+      totalPages = Math.ceil(data.count / data.results.length);
+
+      if (data.previous) {
+        $("#pagination").append(`<button onclick="load(currentPage-1)">Prev</button>`);
+      }
+      $("#pagination").append(`<span> Page ${currentPage} of ${totalPages} </span>`);
+      if (data.next) {
+        $("#pagination").append(`<button onclick="load(currentPage+1)">Next</button>`);
+      }
+    }
+
+    // load tasks with pagination
+    function load(page=1){
+      currentPage = page;
+      $.ajax({
+        url: `/api/tasks/?page=${page}`,
+        type: "GET",
+        headers: authHeaders(),
+        success: function(data){
+          render(data.results);
+          renderPagination(data);
+        }
+      });
+    }
+
+    // create task
+    $("#createBtn").click(function(){
+      const fd = new FormData();
+      fd.append("title", $("#title").val());
+      fd.append("description", $("#desc").val());
+      const f = $("#file")[0].files[0];
+      if (f) fd.append("attachment", f);
+
+      $.ajax({
+        url: "/api/tasks/",
+        type: "POST",
+        headers: authHeaders(),
+        processData: false,
+        contentType: false,
+        data: fd,
+        success: function(){
+          $("#title").val(""); $("#desc").val(""); $("#file").val("");
+          load(currentPage); // reload current page
+        }
+      });
+    });
+
+    // update task
+    window.updateTask = function(id){
+      const fd = new FormData();
+      fd.append("title", $(`#t-${id}-title`).val());
+      fd.append("description", $(`#t-${id}-desc`).val());
+      const f = $(`#t-${id}-file`)[0].files[0];
+      if (f) fd.append("attachment", f);
+
+      $.ajax({
+        url: `/api/tasks/${id}/`,
+        type: "PUT",
+        headers: authHeaders(),
+        processData: false,
+        contentType: false,
+        data: fd,
+        success: function(){ load(currentPage); }
+      });
+    }
+
+    // delete task
+    window.deleteTask = function(id){
+      $.ajax({
+        url: `/api/tasks/${id}/`,
+        type: "DELETE",
+        headers: authHeaders(),
+        success: function(){ $(`#task-${id}`).remove(); }
+      });
+    }
+
+    load(); // initial load
+  </script>
+</body>
+</html> {% endcomment %}
+
+
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Tasks</title>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <style>
+    body{font-family:sans-serif;max-width:900px;margin:3rem auto}
+    input,textarea,button{padding:.6rem;margin:.25rem 0}
+    .grid{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:1rem;align-items:center}
+    .card{border:1px solid #ddd;border-radius:10px;padding:1rem;margin:.5rem 0}
+    .top{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem}
+    .nav{margin-bottom:1rem}
+    #pagination{margin-top:1rem}
+    #pagination button{padding:.5rem 1rem;margin:0 .25rem}
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="/profile/">Profile</a> ·
+    <a href="/" onclick="logout()">Logout</a>
+  </div>
+
+  <h2>My Tasks</h2>
+
+  <div class="top">
+    <!-- left: task creation -->
+    <div>
+      <input id="title" placeholder="Task title" style="width:100%" />
+      <textarea id="desc" placeholder="Description" style="width:100%"></textarea>
+      <input id="file" type="file" />
+      <button id="createBtn">Create Task</button>
+    </div>
+    <!-- right: search bar -->
+    <div>
+      <input id="search" placeholder="Search tasks by title..." style="width:100%" />
+    </div>
+  </div>
+
+  <div id="list"></div>
+  <div id="pagination"></div>
+
+  <script>
+    const token = localStorage.getItem("access");
+    if (!token) window.location.href = "/";
+
+    function authHeaders(){ return { "Authorization": "Bearer " + token }; }
+    function logout(){ localStorage.clear(); }
+
+    let currentPage = 1;
+    let currentSearch = "";
+    let totalPages = 1;
+
+    // render tasks
+    function render(tasks){
+      $("#list").empty();
+      tasks.forEach(t => {
+        const a = t.attachment ? `<a href="${t.attachment}" target="_blank">Attachment</a>` : "—";
+        $("#list").append(`
+          <div class="card" id="task-${t.id}">
+            <div class="grid">
+              <input value="${t.title}" id="t-${t.id}-title" />
+              <div>Created: ${new Date(t.created_at).toLocaleString()}</div>
+              <div>Updated: ${new Date(t.modified_at).toLocaleString()}</div>
+              <div>${a}</div>
+            </div>
+            <textarea id="t-${t.id}-desc" style="width:100%">${t.description || ""}</textarea>
+            <div>
+              <input type="file" id="t-${t.id}-file" />
+              <button onclick="updateTask(${t.id})">Save</button>
+              <button onclick="deleteTask(${t.id})">Delete</button>
+            </div>
+          </div>
+        `);
+      });
+    }
+
+    // render pagination buttons
+    function renderPagination(data){
+      $("#pagination").empty();
+      const pageSize = data.results.length || 1;
+      totalPages = Math.ceil(data.count / pageSize);
+
+      if (data.previous) {
+        $("#pagination").append(`<button onclick="load(currentPage-1, currentSearch)">Prev</button>`);
+      }
+      $("#pagination").append(`<span> Page ${currentPage} of ${totalPages} </span>`);
+      if (data.next) {
+        $("#pagination").append(`<button onclick="load(currentPage+1, currentSearch)">Next</button>`);
+      }
+    }
+
+    // load tasks with pagination + search
+    function load(page=1, search=""){
+      currentPage = page;
+      currentSearch = search;
+      $.ajax({
+        url: `/api/tasks/?page=${page}&search=${encodeURIComponent(search)}`,
+        type: "GET",
+        headers: authHeaders(),
+        success: function(data){
+          render(data.results);
+          renderPagination(data);
+        }
+      });
+    }
+
+    // debounce helper
+    function debounce(func, delay){
+      let timer;
+      return function(...args){
+        clearTimeout(timer);
+        timer = setTimeout(() => func.apply(this, args), delay);
+      }
+    }
+
+    // search (typeahead)
+    $("#search").on("keyup", debounce(function(){
+      const query = $(this).val();
+      load(1, query); // reset to first page on new search
+    }, 300));
+
+    // create task
+    $("#createBtn").click(function(){
+      const fd = new FormData();
+      fd.append("title", $("#title").val());
+      fd.append("description", $("#desc").val());
+      const f = $("#file")[0].files[0];
+      if (f) fd.append("attachment", f);
+
+      $.ajax({
+        url: "/api/tasks/",
+        type: "POST",
+        headers: authHeaders(),
+        processData: false,
+        contentType: false,
+        data: fd,
+        success: function(){
+          $("#title").val(""); $("#desc").val(""); $("#file").val("");
+          load(currentPage, currentSearch);
+        }
+      });
+    });
+
+    // update task
+    window.updateTask = function(id){
+      const fd = new FormData();
+      fd.append("title", $(`#t-${id}-title`).val());
+      fd.append("description", $(`#t-${id}-desc`).val());
+      const f = $(`#t-${id}-file`)[0].files[0];
+      if (f) fd.append("attachment", f);
+
+      $.ajax({
+        url: `/api/tasks/${id}/`,
+        type: "PUT",
+        headers: authHeaders(),
+        processData: false,
+        contentType: false,
+        data: fd,
+        success: function(){ load(currentPage, currentSearch); }
+      });
+    }
+
+    // delete task
+    window.deleteTask = function(id){
+      $.ajax({
+        url: `/api/tasks/${id}/`,
+        type: "DELETE",
+        headers: authHeaders(),
+        success: function(){ $(`#task-${id}`).remove(); }
+      });
+    }
+
+    load(); // initial load
+  </script>
+</body>
+</html>
